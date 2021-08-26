@@ -42,6 +42,13 @@ def import_mappings_to_sqlite(db_sqlite_file, huri_tsv_file, mapping_tsv_file):
         df = df.rename(columns={c: c.replace(' ', '') for c in df.columns})  # Remove spaces from columns
 
         df.to_sql('mapping', newdb, index=False, if_exists='append')
+
+    cur.execute('''CREATE INDEX "map_index" ON "mapping" (
+                    "Ensembl"	ASC,
+                    "UniProtKB_AC"
+                );''')
+    newdb.commit()
+
     newdb.close()
 
 
@@ -54,6 +61,12 @@ def import_raw_mappings_to_sqlite(db_sqlite_file, raw_mapping_tsv_file):
                     "ID_type"	TEXT,
                     "ID"	TEXT
                 );''')
+    cur.execute('''CREATE INDEX "genemap_index" ON "rawmap" (
+                    "UniProtKB_AC"	ASC,
+                    "ID"	ASC
+                );''')
+    db.commit()
+
     a_file = gzip.open(raw_mapping_tsv_file, 'rt')
     rows = csv.reader(a_file, delimiter='\t')
     rows_to_insert = list()
@@ -79,7 +92,32 @@ if __name__ == '__main__':
     db = sqlite3.connect(db_sqlite)
     cur = db.cursor()
 
-    cur.execute("SELECT DISTINCT p1 as p FROM interactome UNION SELECT DISTINCT p2 as p FROM interactome;")
+    cur.execute("DROP TABLE IF EXISTS annotations;")
+    cur.execute('''CREATE TABLE "annotations" (
+                    "id"	TEXT,
+                    "geneProductId"	TEXT,
+                    "qualifier"	TEXT,
+                    "goId"	TEXT,
+                    "goName"	BLOB,
+                    "goEvidence"	TEXT,
+                    "goAspect"	TEXT,
+                    "evidenceCode"	TEXT,
+                    "reference"	TEXT,
+                    "withFrom"	TEXT,
+                    "taxonId"	INTEGER,
+                    "taxonName"	TEXT,
+                    "assignedBy"	TEXT,
+                    "extensions"	TEXT,
+                    "targetSets"	TEXT,
+                    "symbol"	TEXT,
+                    "date"	TEXT,
+                    "synonyms"	TEXT,
+                    "name"	TEXT,
+                    "Ensembl"	TEXT,
+                    "interactingTaxonId"	INTEGER
+                );''')
+    db.commit()
+    cur.execute("SELECT DISTINCT p1 as p FROM huri_interactome UNION SELECT DISTINCT p2 as p FROM huri_interactome;")
     all_genes = [r[0] for r in cur]
     cur.execute("SELECT DISTINCT Ensembl FROM annotations;")
     already_annotated_genes = [r[0] for r in cur]
