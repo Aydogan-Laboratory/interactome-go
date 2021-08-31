@@ -1,13 +1,13 @@
+import logging
 import os
+import sqlite3
 import sys
-import csv
-import gzip
 import time
 
-import pandas as pd
-import sqlite3
 import bioservices
-import logging
+import pandas as pd
+
+from downloads import download_files
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 log = logging.getLogger('GO-db')
@@ -23,6 +23,7 @@ def import_mappings_to_sqlite(db_sqlite_file, huri_tsv_file, mapping_tsv_file):
         os.remove(db_sqlite_file)
 
     newdb = sqlite3.connect(db_sqlite_file)
+    cur = newdb.cursor()
 
     # populate interactome database
     for df in pd.read_csv(huri_tsv_file, sep='\t', encoding='utf-8',
@@ -52,44 +53,28 @@ def import_mappings_to_sqlite(db_sqlite_file, huri_tsv_file, mapping_tsv_file):
     newdb.close()
 
 
-def import_raw_mappings_to_sqlite(db_sqlite_file, raw_mapping_tsv_file):
-    con = sqlite3.connect(db_sqlite_file)
-    cur = con.cursor()
-    cur.execute("DROP TABLE IF EXISTS rawmap;")
-    cur.execute('''CREATE TABLE rawmap (
-                    "UniProtKB_AC"	TEXT,
-                    "ID_type"	TEXT,
-                    "ID"	TEXT
-                );''')
-    cur.execute('''CREATE INDEX "genemap_index" ON "rawmap" (
-                    "UniProtKB_AC"	ASC,
-                    "ID"	ASC
-                );''')
+def import_hgnc_to_sqlite(db_sqlite_file):
+    hgnc_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/hgnc_complete_set.txt'
+    db = sqlite3.connect(f"file:{db_sqlite_file}", uri=True)
+    cur = db.cursor()
+    cur.execute('DROP TABLE IF EXISTS hgnc;')
     db.commit()
 
-    a_file = gzip.open(raw_mapping_tsv_file, 'rt')
-    rows = csv.reader(a_file, delimiter='\t')
-    rows_to_insert = list()
-    for r in rows:
-        if 'Gene_Name' in r:
-            log.debug(f"Inserting {r} into DB.")
-            rows_to_insert.append(r)
-    cur.executemany("INSERT INTO rawmap VALUES (?, ?, ?)", rows_to_insert)
+    for df in pd.read_csv(hgnc_file, sep='\t', encoding='utf-8',
+                          chunksize=1e6, iterator=True,
+                          usecols=['hgnc_id',
+                                   'symbol', 'name',
+                                   'alias_symbol', 'alias_name',
+                                   'locus_group', 'locus_type',
+                                   'entrez_id', 'ensembl_gene_id', 'uniprot_ids']):
+        print(df.size)
+        df = df.rename(columns={c: c.replace(' ', '') for c in df.columns})  # Remove spaces from columns
 
-    con.commit()
-    con.close()
+        df.to_sql('hgnc', db, index=False, if_exists='append')
 
 
-if __name__ == '__main__':
-    huri_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/HuRI.tsv'
-    map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping_selected.tab.gz'
-    raw_map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping.dat.gz'
-    db_sqlite = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/go-interactome.db'
-
-    # load interactions from HuRI database in Ensembl format
-    import_mappings_to_sqlite(db_sqlite, huri_file, map_file)
-    import_raw_mappings_to_sqlite(db_sqlite, raw_map_file)
-    db = sqlite3.connect(db_sqlite)
+def import_annotations_from_quickgo(db_sqlite_file):
+    db = sqlite3.connect(f"file:{db_sqlite_file}", uri=True)
     cur = db.cursor()
 
     cur.execute("DROP TABLE IF EXISTS annotations;")
@@ -117,7 +102,7 @@ if __name__ == '__main__':
                     "interactingTaxonId"	INTEGER
                 );''')
     db.commit()
-    cur.execute("SELECT DISTINCT p1 as p FROM huri_interactome UNION SELECT DISTINCT p2 as p FROM huri_interactome;")
+    cur.execute("SELECT DISTINCT p1 as p FROM interactome UNION SELECT DISTINCT p2 as p FROM interactome;")
     all_genes = [r[0] for r in cur]
     cur.execute("SELECT DISTINCT Ensembl FROM annotations;")
     already_annotated_genes = [r[0] for r in cur]
@@ -150,3 +135,15 @@ if __name__ == '__main__':
             time.sleep(0.4)
     db.commit()
     db.close()
+
+
+if __name__ == '__main__':
+    huri_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/HuRI.tsv'
+    map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping_selected.tab.gz'
+    raw_map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping.dat.gz'
+    db_sqlite = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/go-interactome.db'
+    download_files()
+
+    # load interactions from HuRI database in Ensembl format
+    import_mappings_to_sqlite(db_sqlite, huri_file, map_file)
+    import_hgnc_to_sqlite(db_sqlite)
