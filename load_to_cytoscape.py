@@ -89,7 +89,43 @@ def carlton_cell_cycle_tags():
     # exit()
     df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
     with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
-        df_go.sort_values(by='goId').to_excel(writer, sheet_name='Ontology')
+        df_go.sort_values(by='goId').to_excel(writer, sheet_name='CelCycle-GO')
+    return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
+
+
+def carlton_mitochondria_tags():
+    onto = owl.get_ontology("file://data/go.owl")
+    onto.load()
+
+    all_terms = [
+        onto.search_one(id='GO:0005743'),  # Mitochondrial inner membrane
+        onto.search_one(id='GO:0005758'),  # Mitochondrial intermembrane space
+        onto.search_one(id='GO:0005759'),  # Mitochondrial matrix
+        onto.search_one(id='GO:0005741'),  # Mitochondrial outer membrane
+        onto.search_one(id='GO:0005739'),  # Mitochondrion
+    ]
+
+    df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
+    with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
+        df_go.sort_values(by='goId').to_excel(writer, sheet_name='Mitochondria-GO')
+    return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
+
+
+def carlton_er_tags():
+    onto = owl.get_ontology("file://data/go.owl")
+    onto.load()
+
+    all_terms = [
+        onto.search_one(id='GO:0005783'),  # Endoplasmic reticulum
+        onto.search_one(id='GO:0005788'),  # Endoplasmic reticulum lumen
+        onto.search_one(id='GO:0005789'),  # Endoplasmic reticulum membrane
+        onto.search_one(id='GO:0005793'),  # Endoplasmic reticulum-Golgi intermediate compartment membrane
+        onto.search_one(id='GO:0030176'),  # Integral component of endoplasmic reticulum membrane
+    ]
+
+    df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
+    with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
+        df_go.sort_values(by='goId').to_excel(writer, sheet_name='EndopasmicReticulum-GO')
     return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
 
 
@@ -114,28 +150,54 @@ def my_cell_cycle_tags():
 
 
 def interactors(db_sqlite):
-    go_tags = my_cell_cycle_tags()
-    print(go_tags)
-    print(len(go_tags))
     db = sqlite3.connect(f"file:{db_sqlite}", uri=True)
     cur = db.cursor()
-
-    cur.execute('DROP TABLE IF EXISTS filtered;')
-    cur.execute('CREATE TABLE filtered ("Ensembl" TEXT,  "symbol" TEXT,  "alias_symbol" TEXT,  "name" TEXT);')
     csep_str = "', '"
+
+    go_tags = carlton_cell_cycle_tags()
+    print(go_tags)
+    print(len(go_tags))
+
+    print("Populating table of filtered gene products.")
+    cur.execute('DROP TABLE IF EXISTS filtered;')
+    cur.execute('CREATE TABLE filtered ("Ensembl" TEXT, "UniProtKB" TEXT, "symbol" TEXT, "alias_symbol" TEXT, '
+                '"name" TEXT, "in_organelle" NUMERIC DEFAULT 0);')
+    cur.execute('''CREATE INDEX "filtered_index" ON "filtered" (
+                    "Ensembl" ASC,
+                    "symbol" ASC
+                );''')
+    db.commit()
+
     fensmbl_qstr = f"""
         INSERT INTO filtered
-        SELECT M.Ensembl, H.symbol, H.alias_symbol, H.name
+        SELECT M.Ensembl, H.UniProtKB, H.symbol, H.alias_symbol, H.name, 0
             FROM mapping AS M
             INNER JOIN hgnc H ON H.ensembl_gene_id = M.Ensembl
-            WHERE M.Ensembl IN (
-                SELECT DISTINCT Ensembl as FilteredGenes
-                FROM annotations
-                WHERE goId IN ('{csep_str.join(go_tags)}')
-                --AND goEvidence IN ('EXP','IDA','IPI','IMP','IGI','IEP', 'HTP','HDA','HMP','HGI','HEP')
+            WHERE H.uniprot_ids IN (
+                SELECT DISTINCT a.id as FilteredGenes
+                FROM annotations a
+                WHERE a.db='UniProtKB' 
+                AND goId IN ('{csep_str.join(go_tags)}')
+                --AND evidenceCode IN ('EXP','IDA','IPI','IMP','IGI','IEP', 'HTP','HDA','HMP','HGI','HEP')
         );
         """
     cur.execute(fensmbl_qstr)
+    db.commit()
+    print("Table created.")
+
+    organelle_go_tags = carlton_mitochondria_tags()
+    in_organelle_qstr = f"""
+        UPDATE filtered AS f SET in_organelle=1
+        WHERE f.uniprot_ids IN (
+                SELECT DISTINCT a.id as FilteredGenes
+                FROM annotations a
+                WHERE a.db='UniProtKB' 
+                AND goId IN ('{csep_str.join(organelle_go_tags)}')
+                --AND evidenceCode IN ('EXP','IDA','IPI','IMP','IGI','IEP', 'HTP','HDA','HMP','HGI','HEP')
+        );
+    """
+    print(in_organelle_qstr)
+    cur.execute(in_organelle_qstr)
     db.commit()
 
     sql_filtered_genes = f"""
@@ -161,10 +223,10 @@ def filtered_nodes(db_sqlite):
     db = sqlite3.connect(f"file:{db_sqlite}", uri=True)
 
     df = pd.read_sql("""
-    SELECT DISTINCT I1.p1 as id, F1.symbol as name, F1.name as desc FROM interactome as I1
+    SELECT DISTINCT I1.p1 as id, F1.symbol as name, F1.name as desc, F1.in_organelle FROM interactome as I1
     INNER JOIN filtered F1 ON F1.Ensembl = I1.p1
     UNION 
-    SELECT DISTINCT I2.p2 as id, F2.symbol as name, F2.name as desc  FROM interactome as I2
+    SELECT DISTINCT I2.p2 as id, F2.symbol as name, F2.name as desc, F2.in_organelle  FROM interactome as I2
     INNER JOIN filtered F2 ON F2.Ensembl = I2.p2;
     """, db)
     print('CDK1' in df['name'])
@@ -174,8 +236,6 @@ def filtered_nodes(db_sqlite):
 if __name__ == '__main__':
     download_files()
     db_sqlite = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/go-interactome.db'
-
-    my_cell_cycle_tags()
 
     print(dir(p4c))
     print(p4c.cytoscape_ping())

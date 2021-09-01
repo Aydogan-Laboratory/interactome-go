@@ -1,11 +1,11 @@
+import gzip
 import logging
 import os
 import sqlite3
 import sys
-import time
 
-import bioservices
 import pandas as pd
+from Bio.UniProt.GOA import gafiterator
 
 from downloads import download_files
 
@@ -71,68 +71,62 @@ def import_hgnc_to_sqlite(db_sqlite_file):
         df = df.rename(columns={c: c.replace(' ', '') for c in df.columns})  # Remove spaces from columns
 
         df.to_sql('hgnc', db, index=False, if_exists='append')
+    cur.execute('''CREATE INDEX "hgnc_index" ON "hgnc" (
+                    "symbol" ASC,
+                    "evidenceCode" ASC,
+                    "name" ASC
+                );''')
+    db.commit()
 
 
-def import_annotations_from_quickgo(db_sqlite_file):
+def import_annotations_from_gaf(db_sqlite_file):
     db = sqlite3.connect(f"file:{db_sqlite_file}", uri=True)
     cur = db.cursor()
 
     cur.execute("DROP TABLE IF EXISTS annotations;")
     cur.execute('''CREATE TABLE "annotations" (
+                    "db"	TEXT,
                     "id"	TEXT,
-                    "geneProductId"	TEXT,
-                    "qualifier"	TEXT,
+                    "objectSymbol"	TEXT,
+                    -- "qualifier"	TEXT,
                     "goId"	TEXT,
-                    "goName"	BLOB,
-                    "goEvidence"	TEXT,
-                    "goAspect"	TEXT,
+                    -- "reference "	TEXT,
                     "evidenceCode"	TEXT,
-                    "reference"	TEXT,
-                    "withFrom"	TEXT,
-                    "taxonId"	INTEGER,
-                    "taxonName"	TEXT,
-                    "assignedBy"	TEXT,
-                    "extensions"	TEXT,
-                    "targetSets"	TEXT,
-                    "symbol"	TEXT,
+                    -- "withFrom"	TEXT,
+                    "aspect"	TEXT,
+                    "objectName"	INTEGER,
+                    -- "objectSynonym"	TEXT,
+                    "objectType"	TEXT,
+                    -- "taxon"	TEXT,
                     "date"	TEXT,
-                    "synonyms"	TEXT,
-                    "name"	TEXT,
-                    "Ensembl"	TEXT,
-                    "interactingTaxonId"	INTEGER
+                    "assignedBy"	TEXT,
+                    "annotationExtension"	TEXT,
+                    "geneProductFromId"	TEXT
                 );''')
     db.commit()
-    cur.execute("SELECT DISTINCT p1 as p FROM interactome UNION SELECT DISTINCT p2 as p FROM interactome;")
-    all_genes = [r[0] for r in cur]
-    cur.execute("SELECT DISTINCT Ensembl FROM annotations;")
-    already_annotated_genes = [r[0] for r in cur]
-    cur.execute("SELECT Ensembl, UniProtKB_AC FROM mapping WHERE Ensembl LIKE 'ENSG%';")
-    all_maps = {r[0]: r[1] for r in cur}
-    for ensembl_id in all_genes:
-        if not ensembl_id in all_maps.keys():
-            log.warning(f"No results found for Ensembl ID {ensembl_id}.")
-            continue
-        if ensembl_id in already_annotated_genes:
-            log.warning(f"Skipping Ensembl ID {ensembl_id} because it's already annotated.")
-            continue
-        uniprotkb_id = all_maps[ensembl_id]
-        log.info(f"Downloading info of gene with Ensembl ID={ensembl_id}, UniProtKB={uniprotkb_id}.")
 
-        s = bioservices.QuickGO()
-        current_page = 1
-        total_pages = 1
-        while current_page <= total_pages:
-            annotations = s.Annotation(geneProductId=uniprotkb_id, page=current_page)
-            df = pd.DataFrame(annotations['results'])
-            for col in ['withFrom', 'extensions', 'targetSets']:
-                if col in df.columns:
-                    df.loc[:, col] = df[col].apply(lambda r: str(r) if r is not None else None)
-            df.loc[:, 'Ensembl'] = [ensembl_id] * len(df)
-            df.to_sql('annotations', db, index=False, if_exists='append')
-            total_pages = annotations['pageInfo']['total']
-            log.debug(f"Page {current_page}/{total_pages}")
-            current_page += 1
-            time.sleep(0.4)
+    with gzip.open('data/goa_human.gaf.gz', 'rt') as handle:
+        it = gafiterator(handle)
+        # cur.executemany("""INSERT INTO gaf_annotations (db, id, objectSymbol, qualifier, goId,
+        #                  evidenceCode, withFrom, aspect, objectName, objectSynonym,
+        #                  objectType, taxon, date, assignedBy, annotationExtension, geneProductFromId) VALUES (
+        #                  :DB,:DB_Object_ID,:DB_Object_Symbol,:Qualifier,:GO_ID,
+        #                  :Evidence,:With,:Aspect,:DB_Object_Name,:Synonym,
+        #                  :DB_Object_Type,:Taxon_ID,:Date,:Assigned_By,:Annotation_Extension,
+        #                  :Gene_Product_Form_ID)""", it)
+        cur.executemany("""INSERT INTO annotations (db, id, objectSymbol, goId, evidenceCode, 
+                         aspect, objectName, objectType, date, assignedBy, annotationExtension, 
+                         geneProductFromId) VALUES (
+                         :DB,:DB_Object_ID,:DB_Object_Symbol,:GO_ID,
+                         :Evidence,:Aspect,:DB_Object_Name,
+                         :DB_Object_Type,:Date,:Assigned_By,:Annotation_Extension,
+                         :Gene_Product_Form_ID)""", it)
+    db.commit()
+
+    cur.execute('''CREATE INDEX "gaf_index" ON "annotations" (
+                    "goId" ASC,
+                    "goEvidence" ASC
+                );''')
     db.commit()
     db.close()
 
@@ -147,3 +141,4 @@ if __name__ == '__main__':
     # load interactions from HuRI database in Ensembl format
     import_mappings_to_sqlite(db_sqlite, huri_file, map_file)
     import_hgnc_to_sqlite(db_sqlite)
+    import_annotations_from_gaf(db_sqlite)
