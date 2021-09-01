@@ -37,7 +37,7 @@ def import_mappings_to_sqlite(db_sqlite_file, huri_tsv_file, mapping_tsv_file):
            'EMBL_CDS', 'Ensembl', 'Ensembl_TRS', 'Ensembl_PRO', 'Additional PubMed']
     for df in pd.read_csv(mapping_tsv_file, sep='\t', encoding='utf-8',
                           chunksize=1e6, iterator=True,
-                          names=hdr, usecols=['UniProtKB_AC', 'Ensembl', ''],
+                          names=hdr, usecols=['UniProtKB_AC', 'Ensembl'],
                           dtype={'UniProtKB_AC': 'str', 'Ensembl': 'str'}):
         print(df.size)
         df = df.rename(columns={c: c.replace(' ', '') for c in df.columns})  # Remove spaces from columns
@@ -132,7 +132,7 @@ def import_annotations_from_gaf(db_sqlite_file):
 
 
 if __name__ == '__main__':
-    huri_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/HuRI.tsv'
+    huri_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/HI-union.tsv'
     map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping_selected.tab.gz'
     raw_map_file = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/idmapping.dat.gz'
     db_sqlite = '/media/lab/Data/Fabio/Dev/Python-InteractomeGO/data/go-interactome.db'

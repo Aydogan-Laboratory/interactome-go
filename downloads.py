@@ -20,11 +20,20 @@ def download_url(url, output_path):
 
 
 def download_files():
+    go_ontology = 'http://geneontology.org/ontology/go.owl'
+    download_url(go_ontology, os.path.abspath('data/go.owl'))
+
     go_ontology = 'http://geneontology.org/ontology/go.obo'
     download_url(go_ontology, os.path.abspath('data/go.obo'))
 
     hgnc = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/hgnc_complete_set.txt'
     download_url(hgnc, os.path.abspath('data/hgnc_complete_set.txt'))
+
+    huri = 'http://www.interactome-atlas.org/data/HI-union.tsv'
+    download_url(huri, os.path.abspath('data/HI-union.tsv'))
+
+    uniprot_map = 'https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz'
+    download_url(uniprot_map, os.path.abspath('data/idmapping_selected.tab.gz'))
 
     homosapiens_annotations = 'http://geneontology.org/gene-associations/goa_human.gaf.gz'
     download_url(homosapiens_annotations, os.path.abspath('data/goa_human.gaf.gz'))

@@ -53,84 +53,89 @@ def get_parents(ontology: GODag, node: str, levels=1, all_parents=None, optional
     return all_terms
 
 
-def obo_test():
-    g = GODag("data/go-basic.obo", optional_attrs={'relationship'})
-    stk_activity = g.query_term('GO:0004674', verbose=False)
-
-    print(stk_activity.get_all_parents())
-    g.draw_lineage(
-        [stk_activity],
-        # dpi=opts.dpi,
-        # engine=opts.engine,
-        # gml=opts.gml,
-        # output=opts.output,
-        draw_parents=True,
-        draw_children=False,
-    )
-
-
 def carlton_cell_cycle_tags():
-    onto = owl.get_ontology("file://data/go.owl")
-    onto.load()
-    # for c in onto.classes(): print(c.name, c.label,)
+    g = GODag("data/go.obo", optional_attrs={'relationship'})
+
     carlton_go_tags = [
-        onto.search_one(id='GO:0051301'),  # Cell  Division
-        onto.search_one(id='GO:0010458'),  # Exit  from  Mitosis
-        onto.search_one(id='GO:0000278'),  # Mitotic  Cell  Cycle
-        onto.search_one(id='GO:0000281'),  # Mitotic  Cytokinesis
-        onto.search_one(id='GO:1902412'),  # Regulation of Mitotic Cytokinesis
+        g.query_term('GO:0051301', verbose=False),  # Cell  Division
+        g.query_term('GO:0010458', verbose=False),  # Exit  from  Mitosis
+        g.query_term('GO:0000278', verbose=False),  # Mitotic  Cell  Cycle
+        g.query_term('GO:0000281', verbose=False),  # Mitotic  Cytokinesis
+        g.query_term('GO:1902412', verbose=False),  # Regulation of Mitotic Cytokinesis
     ]
-    all_terms = carlton_go_tags
-    # cell_cycle = onto.search_one(id='GO:0007049')  # cell cycle
-    # stk_activity = onto.search_one(id='GO:0004674')  # protein serine/threonine kinase activity
-    # cyclin_stk_activity = onto.search_one(id='GO:0004693')  # cyclin-dependent protein serine/threonine kinase activity
-    # print(stk_activity.is_a)
-    # print(stk_activity.is_part)
-    # exit()
-    df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
+
+    # search and add children of the terms to the list
+    terms = list()
+    optional_relationships = {'is_a', 'part_of', 'regulates', 'negatively_regulates', 'positively_regulates'}
+    for cc in carlton_go_tags:
+        terms.append({'goId': cc.item_id, 'name': cc.name, 'ns': cc.namespace})
+        cc_children = get_children(g, cc.item_id, levels=100, optional_relationships=optional_relationships)
+        for c in cc_children:
+            go_node = g.query_term(c, verbose=False)
+            terms.append({'goId': go_node.item_id, 'name': go_node.name, 'ns': go_node.namespace})
+
+    df_go = pd.DataFrame(terms)
     with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
         df_go.sort_values(by='goId').to_excel(writer, sheet_name='CelCycle-GO')
-    return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
+    return df_go['goId'].values
 
 
 def carlton_mitochondria_tags():
-    onto = owl.get_ontology("file://data/go.owl")
-    onto.load()
+    g = GODag("data/go.obo", optional_attrs={'relationship'})
 
-    all_terms = [
-        onto.search_one(id='GO:0005743'),  # Mitochondrial inner membrane
-        onto.search_one(id='GO:0005758'),  # Mitochondrial intermembrane space
-        onto.search_one(id='GO:0005759'),  # Mitochondrial matrix
-        onto.search_one(id='GO:0005741'),  # Mitochondrial outer membrane
-        onto.search_one(id='GO:0005739'),  # Mitochondrion
+    cc_terms = [
+        g.query_term('GO:0005743', verbose=False),  # Mitochondrial inner membrane
+        g.query_term('GO:0005758', verbose=False),  # Mitochondrial intermembrane space
+        g.query_term('GO:0005759', verbose=False),  # Mitochondrial matrix
+        g.query_term('GO:0005741', verbose=False),  # Mitochondrial outer membrane
+        g.query_term('GO:0005739', verbose=False),  # Mitochondrion
     ]
 
-    df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
+    # search and add children of the terms to the list
+    terms = list()
+    optional_relationships = {'is_a', 'part_of', 'regulates', 'negatively_regulates', 'positively_regulates'}
+    for cc in cc_terms:
+        terms.append({'goId': cc.item_id, 'name': cc.name, 'ns': cc.namespace})
+        cc_children = get_children(g, cc.item_id, levels=100, optional_relationships=optional_relationships)
+        for c in cc_children:
+            go_node = g.query_term(c, verbose=False)
+            terms.append({'goId': go_node.item_id, 'name': go_node.name, 'ns': go_node.namespace})
+
+    df_go = pd.DataFrame(terms)
     with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
         df_go.sort_values(by='goId').to_excel(writer, sheet_name='Mitochondria-GO')
-    return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
+    return df_go['goId'].values
 
 
 def carlton_er_tags():
-    onto = owl.get_ontology("file://data/go.owl")
-    onto.load()
+    g = GODag("data/go.obo", optional_attrs={'relationship'})
 
-    all_terms = [
-        onto.search_one(id='GO:0005783'),  # Endoplasmic reticulum
-        onto.search_one(id='GO:0005788'),  # Endoplasmic reticulum lumen
-        onto.search_one(id='GO:0005789'),  # Endoplasmic reticulum membrane
-        onto.search_one(id='GO:0005793'),  # Endoplasmic reticulum-Golgi intermediate compartment membrane
-        onto.search_one(id='GO:0030176'),  # Integral component of endoplasmic reticulum membrane
+    er_terms = [
+        g.query_term('GO:0005783', verbose=False),  # Endoplasmic reticulum
+        g.query_term('GO:0005788', verbose=False),  # Endoplasmic reticulum lumen
+        g.query_term('GO:0005789', verbose=False),  # Endoplasmic reticulum membrane
+        g.query_term('GO:0005793', verbose=False),  # Endoplasmic reticulum-Golgi intermediate compartment membrane
+        g.query_term('GO:0030176', verbose=False),  # Integral component of endoplasmic reticulum membrane
     ]
 
-    df_go = pd.DataFrame({'goId': [c.name for c in all_terms], 'name': [c.label[0] for c in all_terms]})
+    # search and add children of the terms to the list
+    terms = list()
+    optional_relationships = {'is_a', 'part_of', 'regulates', 'negatively_regulates', 'positively_regulates'}
+    for cc in er_terms:
+        terms.append({'goId': cc.item_id, 'name': cc.name, 'ns': cc.namespace})
+        cc_children = get_children(g, cc.item_id, levels=100, optional_relationships=optional_relationships)
+        for c in cc_children:
+            go_node = g.query_term(c, verbose=False)
+            terms.append({'goId': go_node.item_id, 'name': go_node.name, 'ns': go_node.namespace})
+
+    df_go = pd.DataFrame(terms)
     with pd.ExcelWriter('cytoscape_ontology.xlsx', mode='w') as writer:
         df_go.sort_values(by='goId').to_excel(writer, sheet_name='EndopasmicReticulum-GO')
-    return [o.name.replace('_', ':') for o in all_terms if type(o) == ThingClass]
+    return df_go['goId'].values
 
 
 def my_cell_cycle_tags():
-    g = GODag("data/go-basic.obo", optional_attrs={'relationship'})
+    g = GODag("data/go.obo", optional_attrs={'relationship'})
     cell_cycle = g.query_term('GO:0007049', verbose=False)
 
     optional_relationships = {'is_a', 'part_of', 'regulates', 'negatively_regulates', 'positively_regulates'}
@@ -161,7 +166,7 @@ def interactors(db_sqlite):
     print("Populating table of filtered gene products.")
     cur.execute('DROP TABLE IF EXISTS filtered;')
     cur.execute('CREATE TABLE filtered ("Ensembl" TEXT, "UniProtKB" TEXT, "symbol" TEXT, "alias_symbol" TEXT, '
-                '"name" TEXT, "in_organelle" NUMERIC DEFAULT 0);')
+                '"name" TEXT, "related_to" TEXT);')
     cur.execute('''CREATE INDEX "filtered_index" ON "filtered" (
                     "Ensembl" ASC,
                     "symbol" ASC
@@ -170,7 +175,7 @@ def interactors(db_sqlite):
 
     fensmbl_qstr = f"""
         INSERT INTO filtered
-        SELECT M.Ensembl, H.UniProtKB, H.symbol, H.alias_symbol, H.name, 0
+        SELECT M.Ensembl, H.uniprot_ids, H.symbol, H.alias_symbol, H.name, 'cell_cycle'
             FROM mapping AS M
             INNER JOIN hgnc H ON H.ensembl_gene_id = M.Ensembl
             WHERE H.uniprot_ids IN (
@@ -183,12 +188,16 @@ def interactors(db_sqlite):
         """
     cur.execute(fensmbl_qstr)
     db.commit()
-    print("Table created.")
+    print("Table filled with cell cycle entries.")
 
+    organelle = 'mitochondria'
     organelle_go_tags = carlton_mitochondria_tags()
     in_organelle_qstr = f"""
-        UPDATE filtered AS f SET in_organelle=1
-        WHERE f.uniprot_ids IN (
+        INSERT INTO filtered
+        SELECT M.Ensembl, H.uniprot_ids, H.symbol, H.alias_symbol, H.name, '{organelle}'
+            FROM mapping AS M
+            INNER JOIN hgnc H ON H.ensembl_gene_id = M.Ensembl
+            WHERE H.uniprot_ids IN (
                 SELECT DISTINCT a.id as FilteredGenes
                 FROM annotations a
                 WHERE a.db='UniProtKB' 
@@ -199,9 +208,11 @@ def interactors(db_sqlite):
     print(in_organelle_qstr)
     cur.execute(in_organelle_qstr)
     db.commit()
+    print("Table filled with organelle entries.")
 
     sql_filtered_genes = f"""
-    SELECT DISTINCT I.p1 AS p1e, 
+    SELECT DISTINCT 
+        I.p1 AS p1e, 
         I.p2 AS p2e, 
         F1.symbol as p1gn, 
         F2.symbol as p2gn
@@ -221,14 +232,55 @@ def interactors(db_sqlite):
 
 def filtered_nodes(db_sqlite):
     db = sqlite3.connect(f"file:{db_sqlite}", uri=True)
+    cur = db.cursor()
+    organelle = 'mitochondria'
 
-    df = pd.read_sql("""
-    SELECT DISTINCT I1.p1 as id, F1.symbol as name, F1.name as desc, F1.in_organelle FROM interactome as I1
-    INNER JOIN filtered F1 ON F1.Ensembl = I1.p1
-    UNION 
-    SELECT DISTINCT I2.p2 as id, F2.symbol as name, F2.name as desc, F2.in_organelle  FROM interactome as I2
-    INNER JOIN filtered F2 ON F2.Ensembl = I2.p2;
-    """, db)
+    print("Creating table of network nodes.")
+    cur.execute('DROP TABLE IF EXISTS nodes;')
+    cur.execute('CREATE TABLE nodes ("id" TEXT, "name" TEXT, "desc" TEXT, '
+                '"cell_cycle" NUMERIC DEFAULT 0, '
+                f'"{organelle}" NUMERIC DEFAULT 0);')
+    cur.execute(f'''CREATE INDEX "node_index" ON "nodes" (
+                    "id" ASC,
+                    "cell_cycle" ASC,
+                    "{organelle}" ASC
+                );''')
+    db.commit()
+
+    sql_nodes_insert = f"""
+    INSERT INTO nodes
+    SELECT DISTINCT id, name, desc, 0, 0 FROM 
+    (
+        SELECT DISTINCT I1.p1 as id, F1.symbol as name, F1.name as desc FROM interactome as I1
+        INNER JOIN filtered F1 ON F1.Ensembl = I1.p1
+        UNION 
+        SELECT DISTINCT I2.p2 as id, F2.symbol as name, F2.name as desc FROM interactome as I2
+        INNER JOIN filtered F2 ON F2.Ensembl = I2.p2
+    );
+    """
+    cur.execute(sql_nodes_insert)
+
+    sql_nodes_update_1 = f"""
+    UPDATE nodes SET cell_cycle=1
+    WHERE id IN (
+        SELECT F.Ensembl FROM filtered as F
+        WHERE F.related_to='cell_cycle'
+    );
+    """
+    cur.execute(sql_nodes_update_1)
+
+    sql_nodes_update_2 = f"""
+    UPDATE nodes SET {organelle}=1
+    WHERE id IN (
+        SELECT F.Ensembl FROM filtered as F
+        WHERE F.related_to='{organelle}'
+    );
+    """
+    cur.execute(sql_nodes_update_2)
+    db.commit()
+
+    df = pd.read_sql("SELECT DISTINCT * FROM nodes;", db)
+    db.close()
     print('CDK1' in df['name'])
     return df
 
