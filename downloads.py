@@ -19,24 +19,53 @@ def download_url(url, output_path):
         urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
 
 
+def download_to_data(url):
+    fname = os.path.basename(url)
+    download_url(url, os.path.abspath(os.path.join('data', fname)))
+
+
 def download_files():
-    go_ontology = 'http://geneontology.org/ontology/go.owl'
-    download_url(go_ontology, os.path.abspath('data/go.owl'))
+    # ontologies
+    download_to_data('http://geneontology.org/ontology/go.owl')
+    # ontologies from amigo
+    download_to_data('http://purl.obolibrary.org/obo/cl/cl-simple.owl')
+    download_to_data('http://purl.obolibrary.org/obo/wbbt.owl')
+    download_to_data('http://purl.obolibrary.org/obo/uberon/basic.owl')
+    download_to_data('http://purl.obolibrary.org/obo/po/imports/ncbitaxon_import.owl')
+    download_to_data('http://purl.obolibrary.org/obo/eco/eco-basic.owl')
+    download_to_data('http://purl.obolibrary.org/obo/chebi.owl')
+    download_to_data('http://purl.obolibrary.org/obo/po.owl')
+    download_to_data('http://purl.obolibrary.org/obo/go/extensions/go-gaf.owl')
+    download_to_data('http://purl.obolibrary.org/obo/po/imports/ro_import.owl')
+    download_to_data('http://purl.obolibrary.org/obo/go/extensions/gorel.owl')
+    download_to_data('http://purl.obolibrary.org/obo/ncbitaxon/subsets/taxslim.owl')
+    download_to_data('http://purl.obolibrary.org/obo/pato.owl')
+    download_to_data('http://purl.obolibrary.org/obo/go/extensions/go-modules-annotations.owl')
+    download_to_data('http://purl.obolibrary.org/obo/go/extensions/go-taxon-subsets.owl')
 
-    go_ontology = 'http://geneontology.org/ontology/go.obo'
-    download_url(go_ontology, os.path.abspath('data/go.obo'))
+    download_to_data('http://geneontology.org/ontology/go.obo')
+    download_to_data('http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/hgnc_complete_set.txt')
+    download_to_data('http://www.interactome-atlas.org/data/HI-union.tsv')
+    download_to_data(
+        'https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz')
+    download_to_data('http://geneontology.org/gene-associations/goa_human.gaf.gz')  # annotations for homo sapiens
+    download_to_data('http://current.geneontology.org/annotations/fb.gaf.gz')  # annotations for drosophila
 
-    hgnc = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/hgnc_complete_set.txt'
-    download_url(hgnc, os.path.abspath('data/hgnc_complete_set.txt'))
+    # annotations from amigo
+    download_to_data('http://skyhook.berkeleybop.org/release/products/annotations/paint_other.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/aspgd.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/cgd.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/dictybase.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/ecocyc.gaf.gz')
+    # download_to_data('http://skyhook.berkeleybop.org/release/annotations/fb.gaf.gz')
+    # download_to_data('http://skyhook.berkeleybop.org/release/annotations/goa_human.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/goa_human_complex.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/goa_human_rna.gaf.gz')
+    download_to_data('http://skyhook.berkeleybop.org/release/annotations/goa_uniprot_all_noiea.gaf.gz')
 
-    huri = 'http://www.interactome-atlas.org/data/HI-union.tsv'
-    download_url(huri, os.path.abspath('data/HI-union.tsv'))
-
-    uniprot_map = 'https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz'
-    download_url(uniprot_map, os.path.abspath('data/idmapping_selected.tab.gz'))
-
-    homosapiens_annotations = 'http://geneontology.org/gene-associations/goa_human.gaf.gz'
-    download_url(homosapiens_annotations, os.path.abspath('data/goa_human.gaf.gz'))
-
-    drosophila_annotations = 'http://current.geneontology.org/annotations/fb.gaf.gz'
-    download_url(drosophila_annotations, os.path.abspath('data/fb.gaf.gz'))
+    # annotations from StringDB
+    # download_to_data('https://stringdb-static.org/download/database.schema.v11.5.pdf')
+    download_to_data('https://stringdb-static.org/download/items_schema.v11.5.sql.gz')
+    download_to_data('https://stringdb-static.org/download/network_schema.v11.5.sql.gz')
+    download_to_data('https://stringdb-static.org/download/evidence_schema.v11.5.sql.gz')
+    download_to_data('https://stringdb.meringlab.org/download/homology_schema.v11.5.sql.gz')

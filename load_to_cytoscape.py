@@ -1,11 +1,9 @@
 import sqlite3
 
-import owlready2 as owl
 import pandas as pd
 import py4cytoscape as p4c
 from goatools.godag.go_tasks import get_go2parents, get_go2children
 from goatools.obo_parser import GODag
-from owlready2 import ThingClass
 
 from downloads import download_files
 
@@ -159,7 +157,7 @@ def interactors(db_sqlite):
     cur = db.cursor()
     csep_str = "', '"
 
-    go_tags = carlton_cell_cycle_tags()
+    go_tags = set(carlton_cell_cycle_tags()).union(my_cell_cycle_tags())
     print(go_tags)
     print(len(go_tags))
 
@@ -306,8 +304,6 @@ if __name__ == '__main__':
     print(nodes)
     print(edges)
     p4c.create_network_from_data_frames(nodes, edges,
-                                        title="cell cycle network",
+                                        title="cell cycle & endoplasmic_reticulum",
                                         collection="HuRI")
     p4c.set_visual_style('Marquee')
-    # p4c.load_table_data(all_genes, data_key_column='Ensembl', table='node', table_key_column='name')
-    # p4c.close_session(save_before_closing=False)

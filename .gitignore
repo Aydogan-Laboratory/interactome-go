@@ -1,2 +1,5 @@
-/env/
-/go-interactome.db
+.DS_Store
+.idea/
+__pycache__/
+data/
+logs/
